@@ -1,5 +1,3 @@
-NOTE: THIS IS A WORK IN PROGRESS AND IT'S NOT SUITABLE FOR PRODUCTION YET
----
 
 
 pyWebHDFS a wrapper library to access Hadoop WebHDFS REST API
