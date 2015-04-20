@@ -1,5 +1,3 @@
-## webhdfs.py
-
 A Python 2/3 wrapper library to access Hadoop WebHDFS REST API
 
 ### Requires
