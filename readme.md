@@ -1,10 +1,18 @@
-NOTE: THIS IS A WORK IN PROGRESS AND IT'S NOT SUITABLE FOR PRODUCTION YET
----
+## webhdfs.py
 
+A Python 2/3 wrapper library to access Hadoop WebHDFS REST API
 
-pyWebHDFS a wrapper library to access Hadoop WebHDFS REST API
+### Requires
 
 Require requests module: http://docs.python-requests.org/
+
+### Installation
+
+    $ pip install webhdfspy
+
+### Documentation
+
+### Hadoop configuration
 
 To enable WebHDFS in Hadoop add this to your $HADOOP_DIR/conf/hdfs-site.xml:
 
