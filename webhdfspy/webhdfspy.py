@@ -21,7 +21,7 @@ CONTEXT_ROOT = '/webhdfs/v1'
 OFFSET = 32768  # Default offset in bytes
 
 
-class pyWebHDFSException(Exception):
+class WebHDFSException(Exception):
     def __init__(self, msg):
         self.msg = msg
 
@@ -29,7 +29,7 @@ class pyWebHDFSException(Exception):
         return self.msg
 
 
-class pyWebHDFS(object):
+class WebHDFS(object):
 
     def __init__(self, host, port, username=None):
         self.host = host
@@ -199,5 +199,5 @@ class pyWebHDFS(object):
         return False
 
 if __name__ == "__main__":
-    webHDFS = pyWebHDFS("localhost", 50070, "fabio")
+    webHDFS = WebHDFS("localhost", 50070, "fabio")
     print webHDFS.environ_home()

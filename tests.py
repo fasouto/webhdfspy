@@ -2,12 +2,12 @@
 #-*- coding: utf-8 -*- 
 
 import unittest
-import pyWebHDFS
+import webhdfspy
 
-class pyWebHDFSTests(unittest.TestCase):
+class WebHDFSTests(unittest.TestCase):
 
 	def setUp(self):
-		self.webHDFS = pyWebHDFS.pyWebHDFS('localhost', 50070, 'fabio')
+		self.webHDFS = webhdfspy.WebHDFS('localhost', 50070, 'fabio')
 		self.test_dir = '/pywebhdfs_test'
 
 	def testCreateDir(self):
