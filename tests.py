@@ -5,18 +5,21 @@ import unittest
 import webhdfspy
 
 class WebHDFSTests(unittest.TestCase):
+	"""
+	Warning, this tests will destroy everything under /pywebhdfs_test
+	"""
 
 	def setUp(self):
-		self.webHDFS = webhdfspy.WebHDFS('localhost', 50070, 'fabio')
+		self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
 		self.test_dir = '/pywebhdfs_test'
 
-	def testCreateDir(self):
+	def test_mkdir(self):
 		self.webHDFS.mkdir(self.test_dir , '777')
 		dir_content = self.webHDFS.listdir('/')
 		dir_filenames = (d['pathSuffix'] for d in dir_content)
 		self.assertTrue('pywebhdfs_test' in dir_filenames)
 	
-	def testChmod(self):
+	def test_chmod(self):
 		self.webHDFS.mkdir(self.test_dir , '777')
 		self.webHDFS.chmod(self.test_dir, '444')
 	 	dir_content = self.webHDFS.listdir('/')

@@ -29,7 +29,7 @@ class WebHDFSException(Exception):
         return self.msg
 
 
-class WebHDFS(object):
+class WebHDFSClient(object):
 
     def __init__(self, host, port, username=None):
         self.host = host
@@ -197,7 +197,3 @@ class WebHDFS(object):
         if r.status_code == 200:
             return True
         return False
-
-if __name__ == "__main__":
-    webHDFS = WebHDFS("localhost", 50070, "fabio")
-    print webHDFS.environ_home()
