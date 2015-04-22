@@ -19,4 +19,12 @@ To enable WebHDFS in Hadoop add this to your $HADOOP_DIR/conf/hdfs-site.xml:
              <value>true</value>
         </property>  
 
-WebHDFS documentation: http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html
+To enable append on HDFS you need to configure your hdfs-site.xml as follows:
+
+        <property>
+            <name>dfs.support.append</name>
+            <value>true</value>
+        </property>
+
+
+More about WebHDFS: http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html
