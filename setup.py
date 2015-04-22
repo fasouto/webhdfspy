@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='webhdfspy',
-      version='0.2.1',
+      version='0.3',
       description='A wrapper library to access Hadoop HTTP REST API',
       long_description=readme(),
       classifiers=[
