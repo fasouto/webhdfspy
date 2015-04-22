@@ -37,16 +37,29 @@ class WebHDFSClient(object):
         self.user = username
         self.namenode_url = 'http://%s:%s%s' % (host, port, CONTEXT_ROOT)
 
-    def _query(self, method, path, params, allow_redirects=False):
+    def _make_request(self, method, path, params, allow_redirects=False):
+        params['user.name'] = 'fabio'
+        return requests.request(method, "%s%s" % (self.namenode_url, path), params=params, allow_redirects=allow_redirects)
+
+    def _query(self, method, path, params, json_path=['boolean'], allow_redirects=False):
         """
         Make an HTTP request formatting the parameters as required
         """
         params['user.name'] = 'fabio'
-        r = requests.request(method, "%s%s" % (self.namenode_url, path), params=params, allow_redirects=allow_redirects)
+        r = self._make_request(method, path, params, allow_redirects)
         r.raise_for_status()
-        return r
 
-    def listdir(self, path):
+        if r.status_code == 200:
+            # Some operations return a json while others return a zero content length response.
+            if json_path:
+                response = json.loads(r.text)
+                for key in json_path:
+                    response = response[key]
+                return response
+            return True
+        raise WebHDFSException('There was an error with your query')
+
+    def listdir(self, path='/'):
         """
         List all the contents of a directory
 
@@ -55,13 +68,8 @@ class WebHDFSClient(object):
         http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html#fileStatusProperties False on error
         """
         params = {'op': 'LISTSTATUS'}
-        r = self._query(method='get', path=path, params=params)
+        return self._query(method='get', path=path, params=params, json_path=['FileStatuses','FileStatus'])
 
-        if r.status_code == 200:
-            r_data = json.loads(r.text)
-            return r_data['FileStatuses']['FileStatus']
-        else:
-            return False
 
     def mkdir(self, path, permission=None):
         """
@@ -74,7 +82,7 @@ class WebHDFSClient(object):
             'op': 'MKDIRS',
             'permission': permission
         }
-        self._query(method='put', path=path, params=params)
+        return self._query(method='put', path=path, params=params)
 
     def remove(self, path, recursive=False):
         """
@@ -87,7 +95,7 @@ class WebHDFSClient(object):
             'op': 'DELETE',
             'recursive': recursive
         }
-        r = self._query(method='delete', path=path, params=params)
+        return self._query(method='delete', path=path, params=params)
 
     def rename(self, src, dst):
         """
@@ -100,22 +108,18 @@ class WebHDFSClient(object):
             'op': 'RENAME',
             'destination': dst
         }
-        r = self._query(method='put', path=src, params=params)
+        return self._query(method='put', path=src, params=params)
 
     def environ_home(self):
         """
         :returns: the home directory of the user
         """
         params = {'op': 'GETHOMEDIRECTORY'}
-        r = self._query(method='get', path='/', params=params)
-        r_data = json.loads(r.text)
-        return r_data['Path']
+        return self._query(method='get', path='/', params=params, json_path=['Path'])
 
     def open(self, path, offset=None, length=None, buffersize=None):
         """
         Open a file to read
-
-        Untested
         """
         params = {
             'op': 'OPEN',
@@ -123,7 +127,7 @@ class WebHDFSClient(object):
             'length': length,
             'buffersize': buffersize
         }
-        r = self._query(method='get', path=path, params=params, allow_redirects=True)
+        r = self._make_request(method='get', path=path, params=params, allow_redirects=True)
         return r.text
 
     def status(self, path):
@@ -134,12 +138,7 @@ class WebHDFSClient(object):
         :returns: a FileStatus dictionary on success, false otherwise
         """
         params = {'op': 'GETFILESTATUS'}
-        r = self._query(method='get', path=path, params=params, allow_redirects=True)
-
-        if r.status_code == 200:
-            r_data = json.loads(r.text)
-            return r_data['FileStatus']
-        return False
+        return self._query(method='get', path=path, params=params, json_path=['FileStatus'], allow_redirects=True)
 
     def chmod(self, path, permission):
         """
@@ -152,10 +151,7 @@ class WebHDFSClient(object):
             'op': 'SETPERMISSION',
             'permission': permission
         }
-        r = self._query(method='put', path=path, params=params)
-        if r.status_code == 200:
-            return True
-        return False
+        return self._query(method='put', path=path, json_path=[], params=params)
 
     def create(self, path, file_data, overwrite=None):
         """
@@ -170,30 +166,22 @@ class WebHDFSClient(object):
             'op': 'CREATE',
             'overwrite': overwrite
         }
-        r = self._query(method='put', path=path, params=params, allow_redirects=False)
+        r = self._make_request(method='put', path=path, params=params, allow_redirects=False)
         datanode_url = r.headers['location']
 
         r = requests.put(datanode_url, data=file_data, headers={'content-type': 'application/octet-stream'})
-        if r.status_code == 403:
-            print "Launch exception 403: The file already exists"
-            return False
+        r.raise_for_status()
         return True
 
     def append(self, path, file_data, buffersize=None):
         """
         Append file_data to a file
 
-        To enable append on HDFS you need to configure your hdfs-site.xml as follows:
-            <property>
-                <name>dfs.support.append</name>
-                <value>true</value>
-            </property>
         """
         params = {'op': 'APPEND'}
-        r = self._query(method='post', path=path, params=params)
+        r = self._make_request(method='post', path=path, params=params)
         datanode_url = r.headers['location']
 
         r = requests.post(datanode_url, data=file_data, params=params)
-        if r.status_code == 200:
-            return True
-        return False
+        r.raise_for_status()
+        return True
