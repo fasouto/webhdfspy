@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*- 
+#-*- coding: utf-8 -*-
 """
-Warning, this tests will destroy everything under /pywebhdfs_test , 
+Warning, this tests will destroy everything under /pywebhdfs_test ,
 modify TEST_DIR_PATH if you want to change this.
 """
 import os.path
@@ -75,13 +75,13 @@ class WebHDFSWriteTests(unittest.TestCase):
 
 class WebHDFSOwnerTests(unittest.TestCase):
     """
-    Test the CMMOD and CHOWN operations 
+    Test the CMMOD and CHOWN operations
     """
     def setUp(self):
         self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
 
     def test_chmod(self):
-        self.webHDFS.mkdir(TEST_DIR_PATH , '777')
+        self.webHDFS.mkdir(TEST_DIR_PATH, '777')
         dir_content = self.webHDFS.listdir(TEST_DIR_PARENT)
         created_dir = [d for d in dir_content if d['pathSuffix'] == TEST_DIR]
         self.assertEqual(created_dir[0]['permission'], '777')

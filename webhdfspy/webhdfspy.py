@@ -68,8 +68,7 @@ class WebHDFSClient(object):
         http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html#fileStatusProperties False on error
         """
         params = {'op': 'LISTSTATUS'}
-        return self._query(method='get', path=path, params=params, json_path=['FileStatuses','FileStatus'])
-
+        return self._query(method='get', path=path, params=params, json_path=['FileStatuses', 'FileStatus'])
 
     def mkdir(self, path, permission=None):
         """
