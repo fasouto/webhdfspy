@@ -5,7 +5,7 @@ webhdfspy
 .. image:: https://badge.fury.io/py/webhdfspy.svg
     :target: http://badge.fury.io/py/webhdfspy
 
-A Python 2/3 wrapper library to access Hadoop WebHDFS REST API
+A Python 2/3 wrapper library to access `Hadoop WebHDFS REST API <https://hadoop.apache.org/docs/r1.0.4/webhdfs.html>`_
 
 
 Installation
@@ -30,14 +30,14 @@ Documentation
 Hadoop configuration
 ====================
 
-To enable WebHDFS in Hadoop add this to your $HADOOP_DIR/conf/hdfs-site.xml:
+To enable WebHDFS in Hadoop add this to your $HADOOP_DIR/conf/hdfs-site.xml: ::
 
         <property>
              <name>dfs.webhdfs.enabled</name>
              <value>true</value>
         </property>  
 
-To enable append on HDFS you need to configure your hdfs-site.xml as follows:
+To enable append on HDFS you need to configure your hdfs-site.xml as follows: ::
 
         <property>
             <name>dfs.support.append</name>
