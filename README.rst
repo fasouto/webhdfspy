@@ -43,6 +43,10 @@ Usage
     >>> print(webHDFS.listdir('/'))
     []
 
+Documentation
+=============
+
+http://webhdfspy.readthedocs.org/en/latest/
 
 
 Hadoop configuration
