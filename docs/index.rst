@@ -1,9 +1,11 @@
+.. webhdfspy documentation master file, created by
+   sphinx-quickstart on Thu Apr 23 18:39:29 2015.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
 =========
 webhdfspy
 =========
-
-.. image:: https://badge.fury.io/py/webhdfspy.svg
-    :target: http://badge.fury.io/py/webhdfspy
 
 A Python 2/3 wrapper library to access `Hadoop WebHDFS REST API <https://hadoop.apache.org/docs/r1.0.4/webhdfs.html>`_
 
@@ -44,24 +46,16 @@ Usage
     []
 
 
+API Documentation
+=================
 
-Hadoop configuration
-====================
+.. autoclass:: webhdfspy.webhdfspy.WebHDFSClient
+	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, append
 
-To enable WebHDFS in Hadoop add this to your $HADOOP_DIR/conf/hdfs-site.xml: ::
+Indices and tables
+==================
 
-        <property>
-             <name>dfs.webhdfs.enabled</name>
-             <value>true</value>
-        </property>  
-
-To enable append on HDFS you need to configure your hdfs-site.xml as follows: ::
-
-        <property>
-            <name>dfs.support.append</name>
-            <value>true</value>
-        </property>
-
-
-More about WebHDFS: http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
 

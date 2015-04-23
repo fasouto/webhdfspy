@@ -6,7 +6,7 @@ def readme():
         return f.read()
 
 setup(name='webhdfspy',
-      version='0.3',
+      version='0.3.1',
       description='A wrapper library to access Hadoop HTTP REST API',
       long_description=readme(),
       classifiers=[
@@ -17,7 +17,7 @@ setup(name='webhdfspy',
         'Topic :: Software Development :: Libraries',
       ],
       keywords='hadoop webhdfs',
-      url='https://github.com/fsouto/webhdfspy',
+      url='https://github.com/fasouto/webhdfspy',
       author='Fabio Souto',
       author_email='fabio@fabiosouto.me',
       license='MIT',

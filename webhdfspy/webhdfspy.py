@@ -32,18 +32,29 @@ class WebHDFSException(Exception):
 class WebHDFSClient(object):
 
     def __init__(self, host, port, username=None):
+        """
+        Create a new WebHDFS client.
+
+        When security is on, we need to specify an username
+        :param host: hostname of the HDFS namenode
+        :param port: port of the namenode
+        :param username: used for authentication
+        """
         self.host = host
         self.port = port
         self.user = username
         self.namenode_url = 'http://%s:%s%s' % (host, port, CONTEXT_ROOT)
 
     def _make_request(self, method, path, params, allow_redirects=False):
+        """
+        Make an HTTP request to the namenode
+        """
         params['user.name'] = 'fabio'
         return requests.request(method, "%s%s" % (self.namenode_url, path), params=params, allow_redirects=allow_redirects)
 
     def _query(self, method, path, params, json_path=['boolean'], allow_redirects=False):
         """
-        Make an HTTP request formatting the parameters as required
+        Call the function to make the request and handle the response
         """
         params['user.name'] = 'fabio'
         r = self._make_request(method, path, params, allow_redirects)
@@ -88,7 +99,7 @@ class WebHDFSClient(object):
         Delete a file o directory
 
         :param path: path of the file or dir to delete
-        :param recursive: true to delete the content in subdirectories
+        :param recursive: set to true to delete the content in subdirectories
         """
         params = {
             'op': 'DELETE',
@@ -119,6 +130,13 @@ class WebHDFSClient(object):
     def open(self, path, offset=None, length=None, buffersize=None):
         """
         Open a file to read
+
+        :param path: path of the file
+        :param offset: starting bit position
+        :param length: number of bits to read
+        :param buffersize: the size of the buffer used to transfer the data
+
+        :returns: the file data
         """
         params = {
             'op': 'OPEN',
@@ -176,6 +194,9 @@ class WebHDFSClient(object):
         """
         Append file_data to a file
 
+        :param path: path of the file
+        :param file_data: data to append to the file
+        :param buffersize: the size of the buffer used to transfer the data
         """
         params = {'op': 'APPEND'}
         r = self._make_request(method='post', path=path, params=params)

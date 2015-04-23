@@ -25,3 +25,8 @@ pip-log.txt
 
 # OSX
 _
+
+# Sphinx
+_build
+_static
+_templates
