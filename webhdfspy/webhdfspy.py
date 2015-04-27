@@ -205,3 +205,16 @@ class WebHDFSClient(object):
         r = requests.post(datanode_url, data=file_data, params=params)
         r.raise_for_status()
         return True
+
+    def set_replication(self, path, replication_factor):
+        """
+        Set the replication factor of a file
+
+        :param path: path of the file
+        :param replication_factor: number of replications, should be > 0
+        """
+        params = {
+            'op': 'SETREPLICATION',
+            'replication': replication_factor
+        }
+        return self._query(method='put', path=path, params=params)

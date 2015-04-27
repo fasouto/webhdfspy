@@ -7,6 +7,7 @@ modify TEST_DIR_PATH if you want to change this.
 import os.path
 import unittest
 import webhdfspy
+import requests
 
 TEST_DIR_PATH = '/pywebhdfs/testing/whatever'                              # path of the testing directory
 TEST_DIR_PARENT = os.path.abspath(os.path.join(TEST_DIR_PATH, os.pardir))  # parent of the testing dir
@@ -122,6 +123,34 @@ class WebHDFSRenameTests(unittest.TestCase):
         dir_content = self.webHDFS.listdir(TEST_DIR_PATH)
         dir_filenames = (d['pathSuffix'] for d in dir_content)
         self.assertIn('bar', dir_filenames)
+
+    def tearDown(self):
+        self.webHDFS.remove(TEST_DIR_PATH, True)
+
+
+class WebHDFSReplicationTests(unittest.TestCase):
+    """
+    Test the set replication operation
+    """
+    def setUp(self):
+        self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
+        self.webHDFS.mkdir(TEST_DIR_PATH)
+
+    def test_replication(self):
+        """
+        Test if we can change the replication of a file
+        """
+        self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar", True)
+        self.webHDFS.set_replication(TEST_DIR_PATH + '/foo.txt', 2)
+        file_status = self.webHDFS.status(TEST_DIR_PATH + '/foo.txt')
+        self.assertEqual(file_status['replication'], 2)
+
+    def test_negative_replication(self):
+        """
+        Test if we can put a negative replication number
+        """
+        self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar", True)
+        self.assertRaises(requests.exceptions.HTTPError, self.webHDFS.set_replication, TEST_DIR_PATH + '/foo.txt', -3)
 
     def tearDown(self):
         self.webHDFS.remove(TEST_DIR_PATH, True)

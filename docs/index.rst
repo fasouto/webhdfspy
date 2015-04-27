@@ -50,7 +50,7 @@ API Documentation
 =================
 
 .. autoclass:: webhdfspy.webhdfspy.WebHDFSClient
-	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, append
+	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, append, set_replication
 
 Indices and tables
 ==================
