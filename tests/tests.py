@@ -94,5 +94,38 @@ class WebHDFSOwnerTests(unittest.TestCase):
     def tearDown(self):
         self.webHDFS.remove(TEST_DIR_PATH, True)
 
+
+class WebHDFSRenameTests(unittest.TestCase):
+    """
+    Test the RENAME operations
+    """
+    def setUp(self):
+        self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
+        self.webHDFS.mkdir(TEST_DIR_PATH)
+
+    def test_rename_file(self):
+        """
+        Test the rename of a file
+        """
+        self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar")
+        self.webHDFS.rename(TEST_DIR_PATH + '/foo.txt', TEST_DIR_PATH + '/bar.txt')
+        dir_content = self.webHDFS.listdir(TEST_DIR_PATH)
+        dir_filenames = (d['pathSuffix'] for d in dir_content)
+        self.assertIn('bar.txt', dir_filenames)
+
+    def test_rename_dir(self):
+        """
+        Test the rename operation in a directory
+        """
+        self.webHDFS.mkdir(TEST_DIR_PATH + "/foo")
+        self.webHDFS.rename(TEST_DIR_PATH + '/foo', TEST_DIR_PATH + '/bar')
+        dir_content = self.webHDFS.listdir(TEST_DIR_PATH)
+        dir_filenames = (d['pathSuffix'] for d in dir_content)
+        self.assertIn('bar', dir_filenames)
+
+    def tearDown(self):
+        self.webHDFS.remove(TEST_DIR_PATH, True)
+
+
 if __name__ == '__main__':
     unittest.main()
