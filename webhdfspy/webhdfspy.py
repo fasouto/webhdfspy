@@ -6,6 +6,7 @@ __author__ = 'fsoutomoure@gmail.com'
 __version__ = '0.2'
 
 import requests
+import logging
 try:
     import json  # Python >= 2.6
 except ImportError:
@@ -31,7 +32,7 @@ class WebHDFSException(Exception):
 
 class WebHDFSClient(object):
 
-    def __init__(self, host, port, username=None):
+    def __init__(self, host, port, username=None, logger=None):
         """
         Create a new WebHDFS client.
 
@@ -44,6 +45,7 @@ class WebHDFSClient(object):
         self.port = port
         self.user = username
         self.namenode_url = 'http://%s:%s%s' % (host, port, CONTEXT_ROOT)
+        self.logger = logger or logging.getLogger(__name__)
 
     def _make_request(self, method, path, params, allow_redirects=False):
         """
@@ -78,6 +80,7 @@ class WebHDFSClient(object):
         :returns: a list of fileStatusProperties:
         http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html#fileStatusProperties False on error
         """
+        self.logger.info("Listing %s", path)
         params = {'op': 'LISTSTATUS'}
         return self._query(method='get', path=path, params=params, json_path=['FileStatuses', 'FileStatus'])
 
@@ -88,6 +91,7 @@ class WebHDFSClient(object):
         :param path: the path of the directory
         :param permission: dir permissions in octal (0-777)
         """
+        self.logger.info("Creating directory %s", path)
         params = {
             'op': 'MKDIRS',
             'permission': permission
@@ -101,6 +105,7 @@ class WebHDFSClient(object):
         :param path: path of the file or dir to delete
         :param recursive: set to true to delete the content in subdirectories
         """
+        self.logger.info("Deleting %s", path)
         params = {
             'op': 'DELETE',
             'recursive': recursive
@@ -114,6 +119,7 @@ class WebHDFSClient(object):
         :param src: path of the file or dir to rename
         :param dst: path of the final file/dir
         """
+        self.logger.info("Renaming %s", src)
         params = {
             'op': 'RENAME',
             'destination': dst
@@ -124,6 +130,7 @@ class WebHDFSClient(object):
         """
         :returns: the home directory of the user
         """
+        self.logger.info("Getting environment home")
         params = {'op': 'GETHOMEDIRECTORY'}
         return self._query(method='get', path='/', params=params, json_path=['Path'])
 
@@ -138,6 +145,7 @@ class WebHDFSClient(object):
 
         :returns: the file data
         """
+        self.logger.info("Opening %s", path)
         params = {
             'op': 'OPEN',
             'offset': offset,
@@ -154,6 +162,7 @@ class WebHDFSClient(object):
         :param path: path of the file/dir
         :returns: a FileStatus dictionary on success, false otherwise
         """
+        self.logger.info("Getting status of %s", path)
         params = {'op': 'GETFILESTATUS'}
         return self._query(method='get', path=path, params=params, json_path=['FileStatus'], allow_redirects=True)
 
@@ -164,6 +173,7 @@ class WebHDFSClient(object):
         :param path: path of the file/dir
         :param permission: dir permissions in octal (0-777)
         """
+        self.logger.info("Setting permissions of %s to %s", path, permission)
         params = {
             'op': 'SETPERMISSION',
             'permission': permission
@@ -179,6 +189,7 @@ class WebHDFSClient(object):
         :param path: the file path to create the file
         :param data: the data to write to the
         """
+        self.logger.info("Creating %s", path)
         params = {
             'op': 'CREATE',
             'overwrite': overwrite
@@ -198,6 +209,7 @@ class WebHDFSClient(object):
         :param file_data: data to append to the file
         :param buffersize: the size of the buffer used to transfer the data
         """
+        self.logger.info("Appending to file %s", path)
         params = {'op': 'APPEND'}
         r = self._make_request(method='post', path=path, params=params)
         datanode_url = r.headers['location']
@@ -213,6 +225,7 @@ class WebHDFSClient(object):
         :param path: path of the file
         :param replication_factor: number of replications, should be > 0
         """
+        self.logger.info("Setting replication factor of %s to %s", path, replication_factor)
         params = {
             'op': 'SETREPLICATION',
             'replication': replication_factor
