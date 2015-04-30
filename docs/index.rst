@@ -50,7 +50,13 @@ API Documentation
 =================
 
 .. autoclass:: webhdfspy.webhdfspy.WebHDFSClient
-	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, append, set_replication
+	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, append, set_replication, get_checksum
+
+
+WebHDFS documentation
+=====================
+
+https://hadoop.apache.org/docs/r1.0.4/webhdfs.html 
 
 Indices and tables
 ==================

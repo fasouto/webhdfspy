@@ -9,7 +9,7 @@ import unittest
 import webhdfspy
 import requests
 
-TEST_DIR_PATH = '/pywebhdfs/testing/whatever'                              # path of the testing directory
+TEST_DIR_PATH = '/pywebhdfs_test'                              # path of the testing directory
 TEST_DIR_PARENT = os.path.abspath(os.path.join(TEST_DIR_PATH, os.pardir))  # parent of the testing dir
 TEST_DIR = os.path.basename(TEST_DIR_PATH)                                 # name of the testing directory
 
@@ -151,6 +151,27 @@ class WebHDFSReplicationTests(unittest.TestCase):
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar", True)
         self.assertRaises(requests.exceptions.HTTPError, self.webHDFS.set_replication, TEST_DIR_PATH + '/foo.txt', -3)
+
+    def tearDown(self):
+        self.webHDFS.remove(TEST_DIR_PATH, True)
+
+
+class WebHDFSChecksumTests(unittest.TestCase):
+    """
+    Test the GETFILECHECKSUM operation
+    """
+    def setUp(self):
+        self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
+        self.webHDFS.mkdir(TEST_DIR_PATH)
+
+    def test_checksum(self):
+        """
+        Test that the GETFILECHECKSUM operation returns a valid checksum
+        """
+        self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar")
+        checksum = self.webHDFS.get_checksum('/foo.txt')
+        self.assertEqual(checksum['bytes'], "000002000000000000000000a881a86e8c56b9e46e5f5e0da49870cf00000000")
+        self.assertEqual(checksum['length'], 28)
 
     def tearDown(self):
         self.webHDFS.remove(TEST_DIR_PATH, True)

@@ -3,7 +3,6 @@
 """A wrapper library to access Hadoop HTTP REST API"""
 
 __author__ = 'fsoutomoure@gmail.com'
-__version__ = '0.2'
 
 import requests
 import logging
@@ -231,3 +230,22 @@ class WebHDFSClient(object):
             'replication': replication_factor
         }
         return self._query(method='put', path=path, params=params)
+
+    def get_checksum(self, path):
+        """
+        Returns the checksum of a file
+
+        :param path: path of the file
+        :returns: a FileChecksum JSON object
+        """
+        self.logger.info("Getting checksum of %s", path)
+        params = {
+            'op': 'GETFILECHECKSUM'
+        }
+        r = self._make_request(method='get', path=path, params=params)
+        datanode_url = r.headers['location']
+
+        r = requests.get(datanode_url)
+        r.raise_for_status()
+        return json.loads(r.text)['FileChecksum']
+
