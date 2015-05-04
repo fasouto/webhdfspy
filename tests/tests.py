@@ -169,8 +169,8 @@ class WebHDFSChecksumTests(unittest.TestCase):
         Test that the GETFILECHECKSUM operation returns a valid checksum
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar")
-        checksum = self.webHDFS.get_checksum('/foo.txt')
-        self.assertEqual(checksum['bytes'], "000002000000000000000000a881a86e8c56b9e46e5f5e0da49870cf00000000")
+        checksum = self.webHDFS.get_checksum(TEST_DIR_PATH + '/foo.txt')
+        self.assertEqual(checksum['bytes'], "00000200000000000000000043d7180b6d1dfa6acae636572cd3b70f00000000")
         self.assertEqual(checksum['length'], 28)
 
     def tearDown(self):

@@ -257,6 +257,7 @@ class WebHDFSClient(object):
             'op': 'GETFILECHECKSUM'
         }
         r = self._make_request(method='get', path=path, params=params)
+        r.raise_for_status()
         datanode_url = r.headers['location']
 
         r = requests.get(datanode_url)
