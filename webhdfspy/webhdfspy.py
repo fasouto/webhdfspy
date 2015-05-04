@@ -4,6 +4,7 @@
 
 __author__ = 'fsoutomoure@gmail.com'
 
+import os
 import requests
 import logging
 try:
@@ -69,7 +70,7 @@ class WebHDFSClient(object):
                     response = response[key]
                 return response
             return True
-        raise WebHDFSException('There was an error with your query')
+        raise WebHDFSException("There was an error with your query")
 
     def listdir(self, path='/'):
         """
@@ -199,6 +200,19 @@ class WebHDFSClient(object):
         r = requests.put(datanode_url, data=file_data, headers={'content-type': 'application/octet-stream'})
         r.raise_for_status()
         return True
+
+    def copyfromlocal(self, local_path, hdfs_path, overwrite=None):
+        """
+        Copy a file from the local filesystem to HDFS
+
+        :param local_path: path of the file to move
+        :param hdfs_path: hdfs path to copy the file
+        """
+        self.logger.info("Copying local file %s to %s", local_path, hdfs_path)
+        if not os.path.exists(local_path):
+            raise WebHDFSException("The local file %s doesn't exists" % local_path)
+        with open(local_path, 'rb') as reader:
+            self.create(hdfs_path, reader, overwrite=overwrite)
 
     def append(self, path, file_data, buffersize=None):
         """
