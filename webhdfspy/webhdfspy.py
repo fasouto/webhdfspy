@@ -51,14 +51,14 @@ class WebHDFSClient(object):
         """
         Make an HTTP request to the namenode
         """
-        params['user.name'] = 'fabio'
+        params['user.name'] = self.username
         return requests.request(method, "%s%s" % (self.namenode_url, path), params=params, allow_redirects=allow_redirects)
 
     def _query(self, method, path, params, json_path=['boolean'], allow_redirects=False):
         """
         Call the function to make the request and handle the response
         """
-        params['user.name'] = 'fabio'
+        params['user.name'] = self.username
         r = self._make_request(method, path, params, allow_redirects)
         r.raise_for_status()
 
