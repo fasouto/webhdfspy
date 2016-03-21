@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 """A wrapper library to access Hadoop HTTP REST API"""
 
-__author__ = 'fsoutomoure@gmail.com'
+__author__ = 'fabio@fabiosouto.me'
 
 import os
 import requests
