@@ -5,19 +5,10 @@ __author__ = 'fabio@fabiosouto.me'
 
 import os
 import logging
+import json
 
 import requests
 
-try:
-    import json  # Python >= 2.6
-except ImportError:
-    try:
-        import simplejson as json  # Python < 2.6
-    except ImportError:
-        try:
-            from django.utils import simplejson as json
-        except ImportError:
-            raise ImportError("Unable to load a json library")
 
 CONTEXT_ROOT = '/webhdfs/v1'
 OFFSET = 32768  # Default offset in bytes
