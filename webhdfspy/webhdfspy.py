@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """A wrapper library to access Hadoop HTTP REST API"""
-
 __author__ = 'fabio@fabiosouto.me'
 
 import os
-import requests
 import logging
+
+import requests
+
 try:
     import json  # Python >= 2.6
 except ImportError:
@@ -52,9 +53,13 @@ class WebHDFSClient(object):
         Make an HTTP request to the namenode
         """
         params['user.name'] = self.username
-        return requests.request(method, "%s%s" % (self.namenode_url, path), params=params, allow_redirects=allow_redirects)
+        return requests.request(method,
+                                "%s%s" % (self.namenode_url, path),
+                                params=params,
+                                allow_redirects=allow_redirects)
 
-    def _query(self, method, path, params, json_path=['boolean'], allow_redirects=False):
+    def _query(self, method, path, params,
+               json_path=['boolean'], allow_redirects=False):
         """
         Call the function to make the request and handle the response
         """
@@ -63,7 +68,8 @@ class WebHDFSClient(object):
         r.raise_for_status()
 
         if r.status_code == 200:
-            # Some operations return a json while others return a zero content length response.
+            # Some operations return a json while others return
+            # a zero content length response.
             if json_path:
                 response = json.loads(r.text)
                 for key in json_path:
@@ -77,12 +83,12 @@ class WebHDFSClient(object):
         List all the contents of a directory
 
         :param path: path of the directory
-        :returns: a list of fileStatusProperties:
-        http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html#fileStatusProperties False on error
+        :returns: a list of fileStatusProperties, False on error
         """
         self.logger.info("Listing %s", path)
         params = {'op': 'LISTSTATUS'}
-        return self._query(method='get', path=path, params=params, json_path=['FileStatuses', 'FileStatus'])
+        return self._query(method='get', path=path, params=params,
+                           json_path=['FileStatuses', 'FileStatus'])
 
     def mkdir(self, path, permission=None):
         """
@@ -132,7 +138,8 @@ class WebHDFSClient(object):
         """
         self.logger.info("Getting environment home")
         params = {'op': 'GETHOMEDIRECTORY'}
-        return self._query(method='get', path='/', params=params, json_path=['Path'])
+        return self._query(method='get', path='/',
+                           params=params, json_path=['Path'])
 
     def open(self, path, offset=None, length=None, buffersize=None):
         """
@@ -152,7 +159,8 @@ class WebHDFSClient(object):
             'length': length,
             'buffersize': buffersize
         }
-        r = self._make_request(method='get', path=path, params=params, allow_redirects=True)
+        r = self._make_request(method='get', path=path,
+                               params=params, allow_redirects=True)
         return r.text
 
     def status(self, path):
@@ -164,7 +172,8 @@ class WebHDFSClient(object):
         """
         self.logger.info("Getting status of %s", path)
         params = {'op': 'GETFILESTATUS'}
-        return self._query(method='get', path=path, params=params, json_path=['FileStatus'], allow_redirects=True)
+        return self._query(method='get', path=path, params=params,
+                           json_path=['FileStatus'], allow_redirects=True)
 
     def chmod(self, path, permission):
         """
@@ -178,7 +187,8 @@ class WebHDFSClient(object):
             'op': 'SETPERMISSION',
             'permission': permission
         }
-        return self._query(method='put', path=path, json_path=[], params=params)
+        return self._query(method='put', path=path, json_path=[],
+                           params=params)
 
     def create(self, path, file_data, overwrite=None):
         """
@@ -194,10 +204,12 @@ class WebHDFSClient(object):
             'op': 'CREATE',
             'overwrite': overwrite
         }
-        r = self._make_request(method='put', path=path, params=params, allow_redirects=False)
+        r = self._make_request(method='put', path=path,
+                               params=params, allow_redirects=False)
         datanode_url = r.headers['location']
 
-        r = requests.put(datanode_url, data=file_data, headers={'content-type': 'application/octet-stream'})
+        r = requests.put(datanode_url, data=file_data,
+                         headers={'content-type': 'application/octet-stream'})
         r.raise_for_status()
         return True
 
@@ -210,7 +222,8 @@ class WebHDFSClient(object):
         """
         self.logger.info("Copying local file %s to %s", local_path, hdfs_path)
         if not os.path.exists(local_path):
-            raise WebHDFSException("The local file %s doesn't exists" % local_path)
+            raise WebHDFSException("The local file {} doesn't exist"
+                                   .format(local_path))
         with open(local_path, 'rb') as reader:
             self.create(hdfs_path, reader, overwrite=overwrite)
 
@@ -220,7 +233,7 @@ class WebHDFSClient(object):
 
         :param path: path of the file
         :param file_data: data to append to the file
-        :param buffersize: the size of the buffer used to transfer the data
+        :param buffersize: size of the buffer used to transfer the data
         """
         self.logger.info("Appending to file %s", path)
         params = {'op': 'APPEND'}
@@ -238,7 +251,8 @@ class WebHDFSClient(object):
         :param path: path of the file
         :param replication_factor: number of replications, should be > 0
         """
-        self.logger.info("Setting replication factor of %s to %s", path, replication_factor)
+        self.logger.info("Setting replication factor of %s to %s",
+                         path, replication_factor)
         params = {
             'op': 'SETREPLICATION',
             'replication': replication_factor
@@ -250,7 +264,7 @@ class WebHDFSClient(object):
         Returns the checksum of a file
 
         :param path: path of the file
-        :returns: a FileChecksum JSON object
+        :returns: FileChecksum JSON
         """
         self.logger.info("Getting checksum of %s", path)
         params = {
@@ -263,4 +277,3 @@ class WebHDFSClient(object):
         r = requests.get(datanode_url)
         r.raise_for_status()
         return json.loads(r.text)['FileChecksum']
-
