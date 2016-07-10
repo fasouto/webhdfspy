@@ -67,5 +67,5 @@ To enable append on HDFS you need to configure your hdfs-site.xml as follows: ::
         </property>
 
 
-More about WebHDFS: http://hadoop.apache.org/common/docs/r1.0.0/webhdfs.html
+More about WebHDFS: https://hadoop.apache.org/docs/r1.0.4/webhdfs.html 
 
