@@ -35,7 +35,7 @@ class WebHDFSClient(object):
         """
         self.host = host
         self.port = port
-        self.user = username
+        self.username = username
         self.namenode_url = 'http://%s:%s%s' % (host, port, CONTEXT_ROOT)
         self.logger = logger or logging.getLogger(__name__)
 
