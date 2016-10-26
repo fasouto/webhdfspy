@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """A wrapper library to access Hadoop HTTP REST API"""
-__author__ = 'fabio@fabiosouto.me'
-
 import os
 import logging
 import json

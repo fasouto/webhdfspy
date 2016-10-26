@@ -1,17 +1,22 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Warning, this tests will destroy everything under /pywebhdfs_test ,
 modify TEST_DIR_PATH if you want to change this.
 """
-import os.path
+import os
 import unittest
-import webhdfspy
+
 import requests
 
-TEST_DIR_PATH = '/pywebhdfs_test'                              # path of the testing directory
-TEST_DIR_PARENT = os.path.abspath(os.path.join(TEST_DIR_PATH, os.pardir))  # parent of the testing dir
-TEST_DIR = os.path.basename(TEST_DIR_PATH)                                 # name of the testing directory
+import webhdfspy
+
+
+TEST_DIR_PATH = '/pywebhdfs_test'  # path of the testing directory
+TEST_DIR_PARENT = os.path.abspath(os.path.join(
+    TEST_DIR_PATH, os.pardir))  # testing dir parent
+TEST_DIR = os.path.basename(TEST_DIR_PATH)  # name of the testing directory
+HADOOP_USERNAME = 'fabio'
 
 
 class WebHDFSDirTests(unittest.TestCase):
@@ -19,7 +24,8 @@ class WebHDFSDirTests(unittest.TestCase):
     Test the operations to create and remove dirs
     """
     def setUp(self):
-        self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070, 'fabio')
+        self.webHDFS = webhdfspy.WebHDFSClient('localhost', 50070,
+                                               HADOOP_USERNAME)
 
     def test_mkdir(self):
         self.webHDFS.mkdir(TEST_DIR_PATH)
@@ -58,14 +64,14 @@ class WebHDFSWriteTests(unittest.TestCase):
         Test if it can create a file and overwrite it later
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foobar.txt', "foobar")
-
-        self.webHDFS.create(TEST_DIR_PATH + '/foobar.txt', "barfoo", overwrite=True)
+        self.webHDFS.create(TEST_DIR_PATH + '/foobar.txt', "barfoo",
+                            overwrite=True)
         file_data = self.webHDFS.open(TEST_DIR_PATH + '/foobar.txt')
         self.assertEqual(file_data, "barfoo")
 
     def test_append(self):
-        self.webHDFS.create(TEST_DIR_PATH + '/barfoo.txt', "foo", overwrite=True)
-
+        self.webHDFS.create(TEST_DIR_PATH + '/barfoo.txt', "foo",
+                            overwrite=True)
         self.webHDFS.append(TEST_DIR_PATH + '/barfoo.txt', "bar")
         file_data = self.webHDFS.open(TEST_DIR_PATH + '/barfoo.txt')
         self.assertEqual(file_data, "foobar")
@@ -109,7 +115,8 @@ class WebHDFSRenameTests(unittest.TestCase):
         Test the rename of a file
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar")
-        self.webHDFS.rename(TEST_DIR_PATH + '/foo.txt', TEST_DIR_PATH + '/bar.txt')
+        self.webHDFS.rename(TEST_DIR_PATH + '/foo.txt',
+                            TEST_DIR_PATH + '/bar.txt')
         dir_content = self.webHDFS.listdir(TEST_DIR_PATH)
         dir_filenames = (d['pathSuffix'] for d in dir_content)
         self.assertIn('bar.txt', dir_filenames)
@@ -150,7 +157,9 @@ class WebHDFSReplicationTests(unittest.TestCase):
         Test if we can put a negative replication number
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar", True)
-        self.assertRaises(requests.exceptions.HTTPError, self.webHDFS.set_replication, TEST_DIR_PATH + '/foo.txt', -3)
+        self.assertRaises(requests.exceptions.HTTPError,
+                          self.webHDFS.set_replication,
+                          TEST_DIR_PATH + '/foo.txt', -3)
 
     def tearDown(self):
         self.webHDFS.remove(TEST_DIR_PATH, True)
@@ -170,7 +179,9 @@ class WebHDFSChecksumTests(unittest.TestCase):
         """
         self.webHDFS.create(TEST_DIR_PATH + '/foo.txt', "foobar")
         checksum = self.webHDFS.get_checksum(TEST_DIR_PATH + '/foo.txt')
-        self.assertEqual(checksum['bytes'], "00000200000000000000000043d7180b6d1dfa6acae636572cd3b70f00000000")
+        self.assertEqual(
+            checksum['bytes'],
+            "00000200000000000000000043d7180b6d1dfa6acae636572cd3b70f00000000")
         self.assertEqual(checksum['length'], 28)
 
     def tearDown(self):
