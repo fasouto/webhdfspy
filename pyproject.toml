@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webhdfspy"
+version = "1.0.0"
+description = "A Python wrapper library to access Hadoop WebHDFS REST API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Fabio Souto", email = "fabio@fabiosouto.me" },
+]
+keywords = ["hadoop", "webhdfs", "hdfs"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "requests>=2.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "responses>=0.20.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/fasouto/webhdfspy"
+Documentation = "http://webhdfspy.readthedocs.org/en/latest/"
+
+[tool.setuptools.packages.find]
+include = ["webhdfspy*"]
