@@ -1,13 +1,8 @@
-.. webhdfspy documentation master file, created by
-   sphinx-quickstart on Thu Apr 23 18:39:29 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 =========
 webhdfspy
 =========
 
-A Python 2/3 wrapper library to access `Hadoop WebHDFS REST API <https://hadoop.apache.org/docs/r1.0.4/webhdfs.html>`_
+A Python wrapper library to access `Hadoop WebHDFS REST API <https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/WebHDFS.html>`_
 
 
 Installation
@@ -21,42 +16,62 @@ To install webhdfspy from PyPI::
 Python versions
 ===============
 
-webhdfspy supports Python 2.7 and 3.4
+webhdfspy requires Python 3.9+
 
 
 Usage
 =====
 ::
-    
+
     >>> import webhdfspy
-    >>> webHDFS = webhdfspy.WebHDFSClient("localhost", 50070, "username")
-    >>> print(webHDFS.listdir('/'))
+    >>> client = webhdfspy.WebHDFSClient("localhost", 50070, "username")
+    >>> print(client.listdir('/'))
     []
-    >>> webHDFS.mkdir('/foo')
+    >>> client.mkdir('/foo')
     True
-    >>> print(webHDFS.listdir('/'))
-    [{u'group': u'supergroup', u'permission': u'755', u'blockSize': 0, u'accessTime': 0, u'pathSuffix': u'foo', u'modificationTime': 1429805040695, u'replication': 0, u'length': 0, u'childrenNum': 0, u'owner': u'username', u'storagePolicy': 0, u'type': u'DIRECTORY', u'fileId': 16387}]
-    >>> print webHDFS.create('/foo/foo.txt', "just put some text here", True)
+    >>> print(client.listdir('/'))
+    [{'group': 'supergroup', 'permission': '755', ...}]
+    >>> client.create('/foo/foo.txt', "just put some text here", overwrite=True)
     True
-    >>> print webHDFS.open('/pywebhdfs_test/foo.txt') 
+    >>> print(client.open('/foo/foo.txt'))
     just put some text here
-    >>> webHDFS.remove('/foo')
+    >>> client.remove('/foo')
     True
-    >>> print(webHDFS.listdir('/'))
+
+Using a context manager::
+
+    >>> with webhdfspy.WebHDFSClient("localhost", 50070, "username") as client:
+    ...     client.listdir('/')
     []
+
+HTTPS support::
+
+    >>> client = webhdfspy.WebHDFSClient("host", 9871, "user", scheme="https")
 
 
 API Documentation
 =================
 
-.. autoclass:: webhdfspy.webhdfspy.WebHDFSClient
-	:members:  __init__, listdir, mkdir, remove, rename, environ_home, open, status, chmod, create, copyfromlocal, append, set_replication, get_checksum
+.. autoclass:: webhdfspy.WebHDFSClient
+	:members:
+
+Exceptions
+----------
+
+.. autoclass:: webhdfspy.WebHDFSException
+	:members:
+
+.. autoclass:: webhdfspy.WebHDFSRemoteException
+	:members:
+
+.. autoclass:: webhdfspy.WebHDFSConnectionError
+	:members:
 
 
 WebHDFS documentation
 =====================
 
-https://hadoop.apache.org/docs/r1.0.4/webhdfs.html 
+https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/WebHDFS.html
 
 Indices and tables
 ==================
@@ -64,4 +79,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
