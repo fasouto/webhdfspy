@@ -50,9 +50,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'webhdfspy'
-copyright = u'2015, Fabio Souto'
-author = u'Fabio Souto'
+project = 'webhdfspy'
+copyright = '2015-2026, Fabio Souto'
+author = 'Fabio Souto'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
