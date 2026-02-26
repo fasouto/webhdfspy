@@ -42,25 +42,25 @@ client = webhdfspy.WebHDFSClient("host", 50070, timeout=30.0)
 
 ### Available operations
 
-- `listdir(path)` - List directory contents
-- `mkdir(path, permission=None)` - Create directories
-- `remove(path, recursive=False)` - Delete files/directories
-- `rename(src, dst)` - Rename files/directories
-- `open(path, offset=None, length=None, buffersize=None)` - Read a file
-- `create(path, file_data, overwrite=None)` - Create a file
-- `append(path, file_data, buffersize=None)` - Append to a file
-- `copyfromlocal(local_path, hdfs_path, overwrite=None)` - Upload a local file
-- `status(path)` - Get file/directory status
-- `chmod(path, permission)` - Set permissions
-- `set_owner(path, owner=None, group=None)` - Set owner/group
-- `set_replication(path, replication_factor)` - Set replication factor
-- `set_times(path, modificationtime=None, accesstime=None)` - Set modification/access time
-- `get_checksum(path)` - Get file checksum
-- `get_content_summary(path)` - Get directory content summary
-- `environ_home()` - Get user home directory
-- `get_delegation_token(renewer)` - Get a delegation token
-- `renew_delegation_token(token)` - Renew a delegation token
-- `cancel_delegation_token(token)` - Cancel a delegation token
+- `listdir(path)` -- List directory contents
+- `mkdir(path, permission=None)` -- Create directories
+- `remove(path, recursive=False)` -- Delete files/directories
+- `rename(src, dst)` -- Rename files/directories
+- `open(path, offset=None, length=None, buffersize=None)` -- Read a file
+- `create(path, file_data, overwrite=None)` -- Create a file
+- `append(path, file_data, buffersize=None)` -- Append to a file
+- `copyfromlocal(local_path, hdfs_path, overwrite=None)` -- Upload a local file
+- `status(path)` -- Get file/directory status
+- `chmod(path, permission)` -- Set permissions
+- `set_owner(path, owner=None, group=None)` -- Set owner/group
+- `set_replication(path, replication_factor)` -- Set replicaton factor
+- `set_times(path, modificationtime=None, accesstime=None)` -- Set modification/access time
+- `get_checksum(path)` -- Get file checksum
+- `get_content_summary(path)` -- Get directory content summary
+- `environ_home()` -- Get user home directory
+- `get_delegation_token(renewer)` -- Get a delegation token
+- `renew_delegation_token(token)` -- Renew a delegation token
+- `cancel_delegation_token(token)` -- Cancel a delegation token
 
 ## Documentation
 
