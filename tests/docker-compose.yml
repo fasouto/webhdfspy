@@ -1,0 +1,42 @@
+# A single-node HDFS cluster for the integration tests.
+#
+#   docker compose -f tests/docker-compose.yml up -d
+#   pytest tests/test_integration.py --integration
+#   docker compose -f tests/docker-compose.yml down -v
+#
+# The DataNode advertises itself by hostname, so WebHDFS redirects point at
+# "datanode:9864". Add `127.0.0.1 datanode` to /etc/hosts, or run the tests
+# from inside the compose network, for the two-step create/read operations.
+services:
+  namenode:
+    image: apache/hadoop:3.4.1
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      ENSURE_NAMENODE_DIR: /tmp/hadoop-root/dfs/name
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      CORE-SITE.XML_fs.defaultFS: hdfs://namenode:9000
+      HDFS-SITE.XML_dfs.replication: "1"
+      HDFS-SITE.XML_dfs.webhdfs.enabled: "true"
+      HDFS-SITE.XML_dfs.support.append: "true"
+      HDFS-SITE.XML_dfs.namenode.http-address: 0.0.0.0:9870
+      HDFS-SITE.XML_dfs.permissions.enabled: "true"
+
+  datanode:
+    image: apache/hadoop:3.4.1
+    hostname: datanode
+    command: ["hdfs", "datanode"]
+    depends_on:
+      - namenode
+    ports:
+      - "9864:9864"
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      CORE-SITE.XML_fs.defaultFS: hdfs://namenode:9000
+      HDFS-SITE.XML_dfs.replication: "1"
+      HDFS-SITE.XML_dfs.webhdfs.enabled: "true"
+      HDFS-SITE.XML_dfs.support.append: "true"
+      HDFS-SITE.XML_dfs.datanode.hostname: datanode

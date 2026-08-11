@@ -1,0 +1,82 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: ruff
+        run: ruff check .
+      - name: mypy
+        run: mypy
+
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest tests/test_unit.py -v
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      - name: Resolve the DataNode hostname
+        # WebHDFS redirects create/read to the DataNode by hostname, so the
+        # runner has to resolve it to the published port.
+        run: echo "127.0.0.1 datanode namenode" | sudo tee -a /etc/hosts
+
+      - name: Start HDFS
+        run: docker compose -f tests/docker-compose.yml up -d
+
+      - name: Wait for WebHDFS
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:9870/webhdfs/v1/?op=LISTSTATUS&user.name=root" >/dev/null; then
+              echo "WebHDFS is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "WebHDFS did not come up in time"
+          docker compose -f tests/docker-compose.yml logs
+          exit 1
+
+      - name: Leave safe mode
+        run: docker compose -f tests/docker-compose.yml exec -T namenode hdfs dfsadmin -safemode leave
+
+      - name: Run integration tests
+        env:
+          WEBHDFSPY_TEST_HOST: localhost
+          WEBHDFSPY_TEST_PORT: "9870"
+          WEBHDFSPY_TEST_USER: root
+        run: pytest tests/test_integration.py --integration -v
+
+      - name: Dump cluster logs on failure
+        if: failure()
+        run: docker compose -f tests/docker-compose.yml logs
+
+      - name: Stop HDFS
+        if: always()
+        run: docker compose -f tests/docker-compose.yml down -v
