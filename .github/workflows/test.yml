@@ -54,7 +54,7 @@ jobs:
       - name: Wait for WebHDFS
         run: |
           for i in $(seq 1 60); do
-            if curl -sf "http://localhost:9870/webhdfs/v1/?op=LISTSTATUS&user.name=root" >/dev/null; then
+            if curl -sf "http://localhost:9870/webhdfs/v1/?op=LISTSTATUS&user.name=hadoop" >/dev/null; then
               echo "WebHDFS is up"; exit 0
             fi
             sleep 5
@@ -70,7 +70,8 @@ jobs:
         env:
           WEBHDFSPY_TEST_HOST: localhost
           WEBHDFSPY_TEST_PORT: "9870"
-          WEBHDFSPY_TEST_USER: root
+          # The image runs as "hadoop", which owns / and is the HDFS superuser.
+          WEBHDFSPY_TEST_USER: hadoop
         run: pytest tests/test_integration.py --integration -v
 
       - name: Dump cluster logs on failure
