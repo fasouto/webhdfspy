@@ -1,15 +1,17 @@
 """A wrapper library to access Hadoop HTTP REST API."""
 from __future__ import annotations
 
-import json
 import logging
 import os
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
 CONTEXT_ROOT = "/webhdfs/v1"
-OFFSET = 32768  # Default offset in bytes
+CHUNK_SIZE = 65536  # Default chunk size in bytes for streaming reads
 
 
 class WebHDFSException(Exception):
@@ -54,38 +56,86 @@ class WebHDFSClient:
 
         with WebHDFSClient("host", 50070, username="user") as client:
             client.listdir("/")
+
+    For an HA cluster, pass every namenode; the client transparently fails
+    over to the next one when the active namenode is standby or unreachable::
+
+        WebHDFSClient(["nn1.example.com", "nn2.example.com"], 9870)
     """
 
     def __init__(
         self,
-        host: str,
+        host: str | Sequence[str],
         port: int,
         username: str | None = None,
         logger: logging.Logger | None = None,
         *,
         timeout: float = 60.0,
         scheme: str = "http",
+        auth: Any = None,
+        verify: bool | str = True,
+        cert: str | tuple[str, str] | None = None,
+        session: requests.Session | None = None,
+        token: str | None = None,
     ) -> None:
         """Create a new WebHDFS client.
 
-        :param host: hostname of the HDFS namenode
-        :param port: port of the namenode
-        :param username: used for authentication
+        :param host: hostname of the HDFS namenode, or a sequence of
+            hostnames to fail over between on an HA cluster
+        :param port: port of the namenode(s)
+        :param username: used for pseudo authentication (``user.name``)
         :param logger: optional logger instance
         :param timeout: request timeout in seconds
         :param scheme: URL scheme, ``"http"`` or ``"https"``
+        :param auth: a ``requests`` auth handler, e.g.
+            ``requests_kerberos.HTTPKerberosAuth()`` for a secured cluster
+        :param verify: verify TLS certificates; may be a path to a CA bundle
+        :param cert: client TLS certificate, as a path or a (cert, key) pair
+        :param session: an existing :class:`requests.Session` to use; when
+            given, the caller stays responsible for closing it
+        :param token: a delegation token to authenticate with, used in
+            preference to ``username``
         """
-        self.host = host
+        self.hosts = [host] if isinstance(host, str) else list(host)
+        if not self.hosts:
+            raise WebHDFSException("At least one host must be specified")
+        self.host = self.hosts[0]
         self.port = port
         self.username = username
         self.timeout = timeout
-        self.namenode_url = f"{scheme}://{host}:{port}{CONTEXT_ROOT}"
+        self.token = token
         self.logger = logger or logging.getLogger(__name__)
-        self._session = requests.Session()
+        self._namenode_urls = [
+            f"{scheme}://{h}:{port}{CONTEXT_ROOT}" for h in self.hosts
+        ]
+        self._active = 0
+        self._owns_session = session is None
+        self._session = session or requests.Session()
+        if auth is not None:
+            self._session.auth = auth
+        if cert is not None:
+            self._session.cert = cert
+        self._session.verify = verify
+
+    @property
+    def namenode_url(self) -> str:
+        """Base URL of the namenode currently believed to be active."""
+        return self._namenode_urls[self._active]
+
+    def set_delegation_token(self, token: str | None) -> None:
+        """Authenticate subsequent requests with a delegation token.
+
+        Pass ``None`` to stop sending a token.
+
+        :param token: the ``urlString`` of a token from
+            :meth:`get_delegation_token`
+        """
+        self.token = token
 
     def close(self) -> None:
-        """Close the underlying HTTP session."""
-        self._session.close()
+        """Close the underlying HTTP session, unless it was supplied by the caller."""
+        if self._owns_session:
+            self._session.close()
 
     def __enter__(self) -> WebHDFSClient:
         return self
@@ -97,28 +147,102 @@ class WebHDFSClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _encode_path(path: str) -> str:
+        """Percent-encode an HDFS path for use in a URL.
+
+        HDFS permits characters such as ``?``, ``#``, ``%`` and spaces in
+        filenames; without encoding they would be parsed as part of the query
+        string or fragment and address the wrong file entirely.
+        """
+        if not path.startswith("/"):
+            path = "/" + path
+        return quote(path, safe="/")
+
+    def _auth_params(self) -> dict[str, Any]:
+        """Return the authentication query parameters for a request."""
+        if self.token is not None:
+            return {"delegation": self.token}
+        if self.username is not None:
+            return {"user.name": self.username}
+        return {}
+
+    def _send(self, method: str, url: str, **kwargs: Any) -> requests.Response:
+        """Perform a single HTTP request, translating transport errors."""
+        try:
+            return self._session.request(
+                method, url, timeout=self.timeout, **kwargs
+            )
+        except requests.RequestException as exc:
+            raise WebHDFSConnectionError(
+                f"Request to {url} failed: {exc}", cause=exc
+            ) from exc
+
+    @staticmethod
+    def _remote_exception(response: requests.Response) -> dict[str, Any] | None:
+        """Return the RemoteException body of an error response, if there is one."""
+        try:
+            remote = response.json()["RemoteException"]
+        except (ValueError, KeyError, TypeError):
+            return None
+        return remote if isinstance(remote, dict) else None
+
+    @classmethod
+    def _is_standby(cls, response: requests.Response) -> bool:
+        """Return whether the response says this namenode is in standby."""
+        if response.status_code not in (403, 500):
+            return False
+        remote = cls._remote_exception(response)
+        if remote is None:
+            return False
+        return "StandbyException" in str(remote.get("exception", ""))
+
     def _make_request(
         self,
         method: str,
         path: str,
         params: dict[str, Any],
         allow_redirects: bool = False,
+        **kwargs: Any,
     ) -> requests.Response:
-        """Make an HTTP request to the namenode."""
-        if self.username is not None:
-            params["user.name"] = self.username
-        try:
-            return self._session.request(
-                method,
-                f"{self.namenode_url}{path}",
-                params=params,
-                allow_redirects=allow_redirects,
-                timeout=self.timeout,
-            )
-        except requests.ConnectionError as exc:
-            raise WebHDFSConnectionError(
-                f"Failed to connect to {self.host}:{self.port}", cause=exc
-            ) from exc
+        """Make an HTTP request to the namenode, failing over between hosts."""
+        request_params = {**params, **self._auth_params()}
+        encoded_path = self._encode_path(path)
+        # Start from the last namenode known to be active, then try the rest.
+        order = [
+            (self._active + offset) % len(self._namenode_urls)
+            for offset in range(len(self._namenode_urls))
+        ]
+        last_error: WebHDFSConnectionError | None = None
+        for index in order:
+            url = f"{self._namenode_urls[index]}{encoded_path}"
+            try:
+                response = self._send(
+                    method,
+                    url,
+                    params=request_params,
+                    allow_redirects=allow_redirects,
+                    **kwargs,
+                )
+            except WebHDFSConnectionError as exc:
+                self.logger.debug("Namenode %s unreachable: %s", self.hosts[index], exc)
+                last_error = exc
+                continue
+            if self._is_standby(response) and len(order) > 1:
+                self.logger.debug("Namenode %s is standby", self.hosts[index])
+                last_error = WebHDFSConnectionError(
+                    f"Namenode {self.hosts[index]} is in standby"
+                )
+                continue
+            self._active = index
+            return response
+        assert last_error is not None  # the loop body always sets it before continuing
+        if len(self.hosts) == 1:
+            raise last_error
+        raise WebHDFSConnectionError(
+            f"No active namenode among {', '.join(self.hosts)}: {last_error}",
+            cause=last_error.cause,
+        )
 
     @staticmethod
     def _check_response(
@@ -130,18 +254,14 @@ class WebHDFSClient:
             expected_status = {200}
         if response.status_code in expected_status:
             return
-        # Try to parse WebHDFS RemoteException
-        try:
-            body = response.json()
-            remote = body["RemoteException"]
+        remote = WebHDFSClient._remote_exception(response)
+        if remote is not None:
             raise WebHDFSRemoteException(
                 message=remote.get("message", ""),
                 status_code=response.status_code,
                 exception=remote.get("exception", ""),
                 java_class_name=remote.get("javaClassName", ""),
             )
-        except (ValueError, KeyError, TypeError):
-            pass
         text = response.text[:500] if response.text else ""
         raise WebHDFSException(
             f"WebHDFS request failed with status {response.status_code}: {text}"
@@ -168,6 +288,15 @@ class WebHDFSClient:
             return response
         return True
 
+    def _redirect_location(self, response: requests.Response, op: str) -> str:
+        """Return the DataNode URL a namenode redirected to."""
+        location = response.headers.get("location")
+        if not location:
+            raise WebHDFSException(
+                f"NameNode did not return a redirect for {op}"
+            )
+        return location
+
     # ------------------------------------------------------------------
     # Directory operations
     # ------------------------------------------------------------------
@@ -178,7 +307,7 @@ class WebHDFSClient:
         :param path: path of the directory
         :returns: a list of FileStatus dicts
         """
-        self.logger.info("Listing %s", path)
+        self.logger.debug("Listing %s", path)
         params = {"op": "LISTSTATUS"}
         return self._query(
             method="get",
@@ -193,7 +322,7 @@ class WebHDFSClient:
         :param path: the path of the directory
         :param permission: dir permissions in octal (e.g. ``"755"``)
         """
-        self.logger.info("Creating directory %s", path)
+        self.logger.debug("Creating directory %s", path)
         params: dict[str, Any] = {"op": "MKDIRS"}
         if permission is not None:
             params["permission"] = permission
@@ -205,8 +334,8 @@ class WebHDFSClient:
         :param path: path of the file or dir to delete
         :param recursive: delete content in subdirectories
         """
-        self.logger.info("Deleting %s", path)
-        params: dict[str, Any] = {"op": "DELETE", "recursive": recursive}
+        self.logger.debug("Deleting %s", path)
+        params: dict[str, Any] = {"op": "DELETE", "recursive": _bool(recursive)}
         return self._query(method="delete", path=path, params=params)
 
     def rename(self, src: str, dst: str) -> bool:
@@ -215,7 +344,7 @@ class WebHDFSClient:
         :param src: path of the file or dir to rename
         :param dst: destination path
         """
-        self.logger.info("Renaming %s", src)
+        self.logger.debug("Renaming %s", src)
         params: dict[str, Any] = {"op": "RENAME", "destination": dst}
         return self._query(method="put", path=src, params=params)
 
@@ -225,21 +354,16 @@ class WebHDFSClient:
 
     def environ_home(self) -> str:
         """Return the home directory of the user."""
-        self.logger.info("Getting environment home")
+        self.logger.debug("Getting environment home")
         params: dict[str, Any] = {"op": "GETHOMEDIRECTORY"}
         return self._query(method="get", path="/", params=params, json_path=["Path"])
 
-    def open(self, path: str, offset: int | None = None, length: int | None = None,
-             buffersize: int | None = None) -> str:
-        """Open a file to read.
-
-        :param path: path of the file
-        :param offset: starting byte position
-        :param length: number of bytes to read
-        :param buffersize: size of the buffer used to transfer the data
-        :returns: the file data as text
-        """
-        self.logger.info("Opening %s", path)
+    def _open_params(
+        self,
+        offset: int | None,
+        length: int | None,
+        buffersize: int | None,
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {"op": "OPEN"}
         if offset is not None:
             params["offset"] = offset
@@ -247,10 +371,92 @@ class WebHDFSClient:
             params["length"] = length
         if buffersize is not None:
             params["buffersize"] = buffersize
-        r = self._make_request(method="get", path=path, params=params,
-                               allow_redirects=True)
+        return params
+
+    def open(self, path: str, offset: int | None = None, length: int | None = None,
+             buffersize: int | None = None, encoding: str = "utf-8") -> str:
+        """Open a text file and return its contents as a string.
+
+        Use :meth:`read` for binary files and :meth:`stream` or
+        :meth:`copytolocal` for files too large to hold in memory.
+
+        :param path: path of the file
+        :param offset: starting byte position
+        :param length: number of bytes to read
+        :param buffersize: size of the buffer used to transfer the data
+        :param encoding: codec used to decode the data
+        :returns: the file data as text
+        """
+        return self.read(path, offset, length, buffersize).decode(encoding)
+
+    def read(self, path: str, offset: int | None = None, length: int | None = None,
+             buffersize: int | None = None) -> bytes:
+        """Read a file and return its contents as bytes.
+
+        :param path: path of the file
+        :param offset: starting byte position
+        :param length: number of bytes to read
+        :param buffersize: size of the buffer used to transfer the data
+        :returns: the file data as bytes
+        """
+        self.logger.debug("Reading %s", path)
+        r = self._make_request(
+            method="get",
+            path=path,
+            params=self._open_params(offset, length, buffersize),
+            allow_redirects=True,
+        )
         self._check_response(r)
-        return r.text
+        return r.content
+
+    @contextmanager
+    def stream(self, path: str, offset: int | None = None, length: int | None = None,
+               buffersize: int | None = None,
+               chunk_size: int = CHUNK_SIZE) -> Iterator[Iterator[bytes]]:
+        """Stream a file's contents without holding it all in memory.
+
+        Yields an iterator of byte chunks::
+
+            with client.stream("/big.bin") as chunks:
+                for chunk in chunks:
+                    process(chunk)
+
+        :param path: path of the file
+        :param offset: starting byte position
+        :param length: number of bytes to read
+        :param buffersize: size of the buffer used to transfer the data
+        :param chunk_size: number of bytes yielded per chunk
+        """
+        self.logger.debug("Streaming %s", path)
+        r = self._make_request(
+            method="get",
+            path=path,
+            params=self._open_params(offset, length, buffersize),
+            allow_redirects=True,
+            stream=True,
+        )
+        try:
+            self._check_response(r)
+            yield r.iter_content(chunk_size=chunk_size)
+        finally:
+            r.close()
+
+    def copytolocal(self, hdfs_path: str, local_path: str,
+                    chunk_size: int = CHUNK_SIZE) -> bool:
+        """Download a file from HDFS to the local filesystem.
+
+        The file is streamed, so its size is not limited by available memory.
+
+        :param hdfs_path: path of the HDFS file
+        :param local_path: local destination path
+        :param chunk_size: number of bytes transferred per chunk
+        """
+        self.logger.debug("Copying %s to local file %s", hdfs_path, local_path)
+        with self.stream(hdfs_path, chunk_size=chunk_size) as chunks, \
+                open(local_path, "wb") as writer:
+            for chunk in chunks:
+                writer.write(chunk)
+        return True
 
     def status(self, path: str) -> dict[str, Any]:
         """Return the FileStatus of a file or directory.
@@ -258,7 +464,7 @@ class WebHDFSClient:
         :param path: path of the file/dir
         :returns: a FileStatus dictionary
         """
-        self.logger.info("Getting status of %s", path)
+        self.logger.debug("Getting status of %s", path)
         params: dict[str, Any] = {"op": "GETFILESTATUS"}
         return self._query(
             method="get",
@@ -274,21 +480,12 @@ class WebHDFSClient:
         :param path: path of the file
         :returns: FileChecksum dict
         """
-        self.logger.info("Getting checksum of %s", path)
+        self.logger.debug("Getting checksum of %s", path)
         params: dict[str, Any] = {"op": "GETFILECHECKSUM"}
         r = self._make_request(method="get", path=path, params=params)
         self._check_response(r, {307})
-        location = r.headers.get("location")
-        if not location:
-            raise WebHDFSException(
-                "NameNode did not return a redirect for GETFILECHECKSUM"
-            )
-        try:
-            r = self._session.get(location, timeout=self.timeout)
-        except requests.ConnectionError as exc:
-            raise WebHDFSConnectionError(
-                "Failed to connect to DataNode for checksum", cause=exc
-            ) from exc
+        location = self._redirect_location(r, "GETFILECHECKSUM")
+        r = self._send("get", location)
         self._check_response(r)
         return r.json()["FileChecksum"]
 
@@ -298,7 +495,7 @@ class WebHDFSClient:
         :param path: path of the directory
         :returns: ContentSummary dict
         """
-        self.logger.info("Getting content summary of %s", path)
+        self.logger.debug("Getting content summary of %s", path)
         params: dict[str, Any] = {"op": "GETCONTENTSUMMARY"}
         return self._query(
             method="get",
@@ -311,37 +508,32 @@ class WebHDFSClient:
     # File write operations
     # ------------------------------------------------------------------
 
-    def create(self, path: str, file_data: Any, overwrite: bool | None = None) -> bool:
+    def create(self, path: str, file_data: Any, overwrite: bool | None = None,
+               encoding: str = "utf-8") -> bool:
         """Create a new file in HDFS.
 
         Uses the two-step WebHDFS create protocol (NameNode redirect then
         DataNode upload).
 
         :param path: the file path to create
-        :param file_data: the data to write
+        :param file_data: the data to write, as text, bytes or a file object
         :param overwrite: whether to overwrite an existing file
+        :param encoding: codec used to encode ``file_data`` when it is text
         """
-        self.logger.info("Creating %s", path)
+        self.logger.debug("Creating %s", path)
         params: dict[str, Any] = {"op": "CREATE"}
         if overwrite is not None:
-            params["overwrite"] = overwrite
+            params["overwrite"] = _bool(overwrite)
         r = self._make_request(method="put", path=path, params=params,
                                allow_redirects=False)
         self._check_response(r, {307})
-        location = r.headers.get("location")
-        if not location:
-            raise WebHDFSException("NameNode did not return a redirect for CREATE")
-        try:
-            r = self._session.put(
-                location,
-                data=file_data,
-                headers={"content-type": "application/octet-stream"},
-                timeout=self.timeout,
-            )
-        except requests.ConnectionError as exc:
-            raise WebHDFSConnectionError(
-                "Failed to connect to DataNode for create", cause=exc
-            ) from exc
+        location = self._redirect_location(r, "CREATE")
+        r = self._send(
+            "put",
+            location,
+            data=_encode_body(file_data, encoding),
+            headers={"content-type": "application/octet-stream"},
+        )
         self._check_response(r, {201})
         return True
 
@@ -354,39 +546,29 @@ class WebHDFSClient:
         :param hdfs_path: HDFS destination path
         :param overwrite: whether to overwrite an existing file
         """
-        self.logger.info("Copying local file %s to %s", local_path, hdfs_path)
+        self.logger.debug("Copying local file %s to %s", local_path, hdfs_path)
         if not os.path.exists(local_path):
             raise WebHDFSException(f"The local file {local_path} doesn't exist")
         with open(local_path, "rb") as reader:
             return self.create(hdfs_path, reader, overwrite=overwrite)
 
     def append(self, path: str, file_data: Any,
-               buffersize: int | None = None) -> bool:
+               buffersize: int | None = None, encoding: str = "utf-8") -> bool:
         """Append data to a file.
 
         :param path: path of the file
-        :param file_data: data to append
+        :param file_data: data to append, as text, bytes or a file object
         :param buffersize: size of the buffer used to transfer the data
+        :param encoding: codec used to encode ``file_data`` when it is text
         """
-        self.logger.info("Appending to file %s", path)
+        self.logger.debug("Appending to file %s", path)
         params: dict[str, Any] = {"op": "APPEND"}
         if buffersize is not None:
             params["buffersize"] = buffersize
         r = self._make_request(method="post", path=path, params=params)
         self._check_response(r, {307})
-        location = r.headers.get("location")
-        if not location:
-            raise WebHDFSException("NameNode did not return a redirect for APPEND")
-        try:
-            r = self._session.post(
-                location,
-                data=file_data,
-                timeout=self.timeout,
-            )
-        except requests.ConnectionError as exc:
-            raise WebHDFSConnectionError(
-                "Failed to connect to DataNode for append", cause=exc
-            ) from exc
+        location = self._redirect_location(r, "APPEND")
+        r = self._send("post", location, data=_encode_body(file_data, encoding))
         self._check_response(r)
         return True
 
@@ -400,7 +582,7 @@ class WebHDFSClient:
         :param path: path of the file/dir
         :param permission: permissions in octal (e.g. ``"755"``)
         """
-        self.logger.info("Setting permissions of %s to %s", path, permission)
+        self.logger.debug("Setting permissions of %s to %s", path, permission)
         params: dict[str, Any] = {"op": "SETPERMISSION", "permission": permission}
         return self._query(method="put", path=path, json_path=[], params=params)
 
@@ -418,7 +600,7 @@ class WebHDFSClient:
         """
         if owner is None and group is None:
             raise WebHDFSException("At least one of owner or group must be specified")
-        self.logger.info("Setting owner of %s", path)
+        self.logger.debug("Setting owner of %s", path)
         params: dict[str, Any] = {"op": "SETOWNER"}
         if owner is not None:
             params["owner"] = owner
@@ -432,7 +614,7 @@ class WebHDFSClient:
         :param path: path of the file
         :param replication_factor: number of replications (>0)
         """
-        self.logger.info(
+        self.logger.debug(
             "Setting replication factor of %s to %s", path, replication_factor
         )
         params: dict[str, Any] = {
@@ -453,7 +635,7 @@ class WebHDFSClient:
         :param modificationtime: modification time in ms since epoch
         :param accesstime: access time in ms since epoch
         """
-        self.logger.info("Setting times of %s", path)
+        self.logger.debug("Setting times of %s", path)
         params: dict[str, Any] = {"op": "SETTIMES"}
         if modificationtime is not None:
             params["modificationtime"] = modificationtime
@@ -468,10 +650,13 @@ class WebHDFSClient:
     def get_delegation_token(self, renewer: str) -> dict[str, Any]:
         """Get a delegation token.
 
+        Pass the token's ``urlString`` to :meth:`set_delegation_token` (or the
+        ``token`` constructor argument) to authenticate with it.
+
         :param renewer: the user who can renew the token
         :returns: Token dict
         """
-        self.logger.info("Getting delegation token for renewer %s", renewer)
+        self.logger.debug("Getting delegation token for renewer %s", renewer)
         params: dict[str, Any] = {"op": "GETDELEGATIONTOKEN", "renewer": renewer}
         return self._query(
             method="get", path="/", params=params, json_path=["Token"]
@@ -483,7 +668,7 @@ class WebHDFSClient:
         :param token: the delegation token
         :returns: new expiration time in ms since epoch
         """
-        self.logger.info("Renewing delegation token")
+        self.logger.debug("Renewing delegation token")
         params: dict[str, Any] = {"op": "RENEWDELEGATIONTOKEN", "token": token}
         return self._query(
             method="put", path="/", params=params, json_path=["long"]
@@ -494,6 +679,24 @@ class WebHDFSClient:
 
         :param token: the delegation token
         """
-        self.logger.info("Cancelling delegation token")
+        self.logger.debug("Cancelling delegation token")
         params: dict[str, Any] = {"op": "CANCELDELEGATIONTOKEN", "token": token}
         return self._query(method="put", path="/", json_path=[], params=params)
+
+
+def _bool(value: bool) -> str:
+    """Render a boolean the way the WebHDFS API documents it."""
+    return "true" if value else "false"
+
+
+def _encode_body(file_data: Any, encoding: str) -> Any:
+    """Encode a text payload to bytes, leaving other payload types alone.
+
+    ``requests`` sends a ``str`` body as-is but derives ``Content-Length`` from
+    its *character* count, so a payload containing any multi-byte character is
+    silently truncated by the DataNode. Encoding it ourselves keeps the header
+    and the body in agreement.
+    """
+    if isinstance(file_data, str):
+        return file_data.encode(encoding)
+    return file_data
