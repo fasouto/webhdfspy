@@ -32,6 +32,16 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "responses>=0.20.0",
+    "ruff>=0.6",
+    "mypy>=1.8",
+    "types-requests",
+]
+docs = [
+    "sphinx>=7.0",
+    "alabaster>=0.7",
+]
+kerberos = [
+    "requests-kerberos>=0.14",
 ]
 
 [project.urls]
@@ -40,3 +50,31 @@ Documentation = "http://webhdfspy.readthedocs.org/en/latest/"
 
 [tool.setuptools.packages.find]
 include = ["webhdfspy*"]
+
+[tool.setuptools.package-data]
+webhdfspy = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: test that needs a running Hadoop cluster (use --integration)",
+]
+
+[tool.ruff]
+line-length = 90
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Nested `with` blocks read more clearly in tests, and test fixture data
+# doesn't need ClassVar annotations.
+"tests/*" = ["SIM117", "RUF012"]
+
+[tool.mypy]
+files = ["webhdfspy"]
+strict = true
+# WebHDFS responses are untyped JSON, so the accessors genuinely return Any;
+# casting each one would assert a shape we cannot actually verify.
+warn_return_any = false
