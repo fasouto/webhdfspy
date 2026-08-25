@@ -1,3 +1,5 @@
+
+
 # webhdfspy
 
 A Python wrapper library to access the [Hadoop WebHDFS REST API](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/WebHDFS.html).
@@ -101,7 +103,7 @@ client.set_delegation_token(token["urlString"])
 | `chmod(path, permission)` | Set permissions |
 | `set_owner(path, owner=None, group=None)` | Set owner/group |
 | `set_replication(path, replication_factor)` | Set replication factor |
-| `set_times(path, modificationtime=None, accesstime=None)` | Set modification/access time |
+| `set_times(path, modificationtime=None, accesstime=None)` | Set modification/access time (ms since epoch) |
 | `get_checksum(path)` | Get file checksum |
 | `get_content_summary(path)` | Get directory content summary |
 | `environ_home()` | Get user home directory |
